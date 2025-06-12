@@ -40,4 +40,15 @@ class McpClientConfig {
         println("Initialized mcp sync")
         return mcp
     }
+
+    @Bean("faqAgent")
+    fun mcpSyncClientFaq(): McpSyncClient {
+        val mcp = McpClient.sync(
+            HttpClientSseClientTransport.builder("http://localhost:8084")
+                .build()
+        ).build()
+        mcp.initialize()
+        println("Initialized mcp sync")
+        return mcp
+    }
 }

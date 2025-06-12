@@ -13,8 +13,13 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class ChatClientConfig {
     @Bean("toolCallbackProvider")
-    fun toolCallbackProvider(profileAgent: McpSyncClient, simulationAgent: McpSyncClient, creditCardLimitAgent: McpSyncClient): ToolCallbackProvider =
-        SyncMcpToolCallbackProvider(profileAgent, simulationAgent, creditCardLimitAgent)
+    fun toolCallbackProvider(
+        profileAgent: McpSyncClient,
+        simulationAgent: McpSyncClient,
+        creditCardLimitAgent: McpSyncClient,
+        faqAgent: McpSyncClient
+    ): ToolCallbackProvider =
+        SyncMcpToolCallbackProvider(profileAgent, simulationAgent, creditCardLimitAgent, faqAgent)
 
     @Bean
     fun chatClient(builder: ChatClient.Builder, toolCallbackProvider: ToolCallbackProvider): ChatClient =

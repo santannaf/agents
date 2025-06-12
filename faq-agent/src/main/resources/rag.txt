@@ -1,0 +1,11 @@
+## Cartão de Crédito
+
+O cartão de crédito permite compras com pagamento posterior. Pode ser usado para parcelamento ou pagamento único.
+
+## Investimentos CDB
+
+CDBs pré-fixados têm uma taxa de juros definida no momento da aplicação. Já os pós-fixados acompanham o CDI.
+
+## Débito Automático
+
+O débito automático permite o pagamento de contas de forma programada.
