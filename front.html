@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Assistente de CDB</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #1e1e2f;
+            --text: #e0e0e0;
+            --card: #2d2d44;
+            --accent: #3b82f6;
+            --user-msg: #324f39;
+            --bot-msg: #2a3d64;
+            --chart-bg: #fff;
+        }
+
+        .light-theme {
+            --bg: #f3f4f6;
+            --text: #1e1e2f;
+            --card: #ffffff;
+            --accent: #3b82f6;
+            --user-msg: #dcfce7;
+            --bot-msg: #e0e7ff;
+            --chart-bg: #ffffff;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .theme-selector {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+            overflow: hidden;
+            transition: background-color 0.3s;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .message::after {
+            content: attr(data-time);
+            position: absolute;
+            bottom: -18px;
+            right: 10px;
+            font-size: 10px;
+            color: #ccc;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
+            border-radius: 50%;
+            background-color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+            overflow: hidden;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            display: block;
+        }
+
+        .bubble {
+            max-width: 95%;
+            background-color: var(--bot-msg);
+            padding: 10px 15px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .user .bubble {
+            background-color: var(--user-msg);
+        }
+
+        .timestamp {
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        .sender-name {
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+
+        .input-area {
+            display: flex;
+            margin-top: 15px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border-radius: 6px 0 0 6px;
+            outline: none;
+            border: 1px solid #606060;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 0 6px 6px 0;
+            cursor: pointer;
+        }
+
+        .grafico-mensagem .bubble {
+            padding: 0;
+            background-color: var(--bot-msg);
+        }
+
+        .grafico-mensagem canvas {
+            width: 100% !important;
+            height: auto !important;
+            border-radius: 10px;
+            background-color: var(--chart-bg);
+        }
+    </style>
+</head>
+<body>
+<div class="theme-selector">
+    <label><input type="radio" name="tema" value="dark" onchange="trocarTema(this.value)">🌙 Escuro</label>
+    <label><input type="radio" name="tema" value="light" onchange="trocarTema(this.value)">☀️ Claro</label>
+</div>
+
+<div class="chat-container">
+    <div class="messages" id="messages"></div>
+
+    <div class="input-area">
+        <input type="text" id="messageInput" placeholder="Digite sua mensagem...">
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+</div>
+
+<script>
+    const messagesDiv = document.getElementById('messages');
+    const input = document.getElementById('messageInput');
+    let chartInstance = null;
+
+    input.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") sendMessage();
+    });
+
+    function renderMessage(role, text) {
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + (role === 'user' ? 'user' : 'bot');
+        msgDiv.innerHTML = `
+        <div class="avatar">${role === 'user' ? '👤' : '🤖'}</div>
+        <div>
+          <div class="bubble">${text}</div>
+          <div class="sender-name">${role === 'user' ? 'Você' : 'Assistente'}</div>
+          <div class="timestamp">${time}</div>
+        </div>`;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function renderTypingMessage() {
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bot';
+        msgDiv.innerHTML = `
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="bubble typing">Assistente está digitando<span class="dots">.</span></div>
+          <div class="sender-name">Assistente</div>
+          <div class="timestamp">${time}</div>
+        </div>`;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        // Animação dos pontinhos
+        const dotsSpan = msgDiv.querySelector('.dots');
+        let count = 1;
+        const interval = setInterval(() => {
+            dotsSpan.textContent = '.'.repeat(count);
+            count = (count % 3) + 1;
+        }, 400);
+
+        // Retornar função para parar a animação
+        return () => clearInterval(interval);
+    }
+
+    function renderizarGrafico(cdbs) {
+        if (!cdbs || cdbs.length === 0) return;
+
+        // Remove gráfico anterior
+        const graficoAnterior = document.querySelector('.grafico-mensagem');
+        if (graficoAnterior) {
+            graficoAnterior.remove();
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+        }
+
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bot grafico-mensagem';
+        msgDiv.innerHTML = `
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="bubble">
+            <canvas id="grafico-${Date.now()}" width="500" height="250"></canvas>
+          </div>
+          <div class="sender-name">Assistente</div>
+          <div class="timestamp">${time}</div>
+        </div>
+      `;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        const canvas = msgDiv.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const datasets = cdbs.map(cdb => ({
+            label: cdb.nome,
+            data: cdb.valores,
+            fill: false,
+            borderColor: gerarCor(),
+            tension: 0.3
+        }));
+
+        const labels = Array.from({ length: cdbs[0].valores.length }, (_, i) => `Mês ${i + 1}`);
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'Evolução do Investimento por Produto'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            display: false // remove grid do eixo X
+                        },
+                        title: {
+                            display: true,
+                            text: 'Valor (R$)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false // remove grid do eixo Y
+                        },
+                        title: {
+                            display: true,
+                            text: 'Prazo (meses)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // const canvas = msgDiv.querySelector('canvas');
+        // const labels = cdbs.map(cdb => cdb.nome);
+        // const data = cdbs.map(cdb => cdb.valorFinal);
+        // const ctx = canvas.getContext('2d');
+
+        // chartInstance = new Chart(ctx, {
+        //     type: 'bar',
+        //     data: {
+        //         labels: labels,
+        //         datasets: [{
+        //             label: 'Valor Final Simulado (R$)',
+        //             data: data,
+        //             backgroundColor: '#3b82f6'
+        //         }]
+        //     },
+        //     options: {
+        //         responsive: true,
+        //         maintainAspectRatio: false,
+        //         plugins: {
+        //             legend: { display: false },
+        //             title: { display: true, text: 'Comparação de Rendimentos dos CDBs' }
+        //         },
+        //         scales: {
+        //             y: { beginAtZero: true }
+        //         }
+        //     }
+        // });
+    }
+
+    function pararAnimacaoCarregamento() {
+        if (loadingInterval) clearInterval(loadingInterval);
+        if (loadingDiv) loadingDiv.remove();
+        loadingDiv = null;
+    }
+
+    async function sendMessage() {
+        const text = input.value.trim();
+        if (!text) return;
+        renderMessage('user', text);
+        input.value = '';
+
+        const typingMsg = renderTypingMessage();
+
+        const response = await fetch('http://localhost:8080/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: "usuario-web", message: text })
+        });
+
+        const mensagem = await response.text();
+        // const result = await response.text();
+        // const mensagem = result.mensagem || "";
+        if (typeof typingMsg === 'function') typingMsg(); // para animação
+        const bubbles = document.querySelectorAll('.bubble');
+        bubbles[bubbles.length - 1].innerText = mensagem;
+
+        // console.log(result);
+
+        // if (result.grafico && result.grafico.length > 0) {
+        //     renderizarGrafico(result.grafico);
+        // } else {
+        //     const graficoAnterior = document.querySelector('.grafico-mensagem');
+        //     if (graficoAnterior) graficoAnterior.remove();
+        //     if (chartInstance) {
+        //         chartInstance.destroy();
+        //         chartInstance = null;
+        //     }
+        // }
+    }
+
+    function trocarTema(valor) {
+        const body = document.body;
+        if (valor === 'light') {
+            body.classList.add("light-theme");
+            localStorage.setItem("tema", "light");
+        } else {
+            body.classList.remove("light-theme");
+            localStorage.setItem("tema", "dark");
+        }
+    }
+
+    function gerarCor() {
+        const r = Math.floor(Math.random() * 200);
+        const g = Math.floor(Math.random() * 200);
+        const b = Math.floor(Math.random() * 200);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function carregarHistorico() {
+        const userId = "usuario-web";
+        fetch(`http://localhost:8080/chat/historico/${userId}`)
+            .then(response => response.json())
+            .then(result => {
+                console.log(result);
+                result.forEach(msg => {
+                    renderMessage(msg.type, msg.content);
+                });
+            });
+    }
+
+    window.onload = () => {
+        const tema = localStorage.getItem("tema") || "dark";
+        document.querySelector(`input[name=tema][value=${tema}]`).checked = true;
+        trocarTema(tema);
+        // carregarHistorico();
+    }
+</script>
+</body>
+</html>
